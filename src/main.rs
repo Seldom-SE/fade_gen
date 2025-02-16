@@ -41,12 +41,12 @@ fn main() -> Result<()> {
         .filter_map(|(y, x)| {
             palette
                 .get_color_at(x, y)
-                .map(|col| (col.alpha() >= 0.5).then(|| (x, y, Oklaba::from(col))))
+                .map(|col| (col.alpha() >= 0.5).then(|| (x, y, col, Oklaba::from(col))))
                 .transpose()
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let &(_, _, to) = palette_cols
+    let &(_, _, _, to) = palette_cols
         .get(cli.to as usize)
         .ok_or_else(|| anyhow!("color index out of bounds"))?;
 
@@ -71,15 +71,15 @@ fn main() -> Result<()> {
         };
         let fade_offset = frame as u32 * palette_height;
 
-        for &(palette_x, palette_y, palette_col) in &palette_cols {
-            let mix = palette_col.mix(&to, t);
+        for &(palette_x, palette_y, _, palette_oklab) in &palette_cols {
+            let mix = palette_oklab.mix(&to, t);
 
-            let &(_, _, fade_col) = palette_cols
+            let &(_, _, fade_col, _) = palette_cols
                 .iter()
-                .min_by_key(|&&(_, _, col)| FloatOrd(mix.distance_squared(&col)))
+                .min_by_key(|&&(_, _, _, col)| FloatOrd(mix.distance_squared(&col)))
                 .ok_or_else(|| anyhow!("input image contains no colors"))?;
 
-            fade.set_color_at(palette_x, palette_y + fade_offset, fade_col.into())?;
+            fade.set_color_at(palette_x, palette_y + fade_offset, fade_col)?;
         }
     }
 
