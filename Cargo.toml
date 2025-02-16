@@ -1,0 +1,16 @@
+[package]
+name = "fade_gen"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+bevy_math = { version = "0.15.2", default-features = false }
+bevy_color = { version = "0.15.3", default-features = false }
+itertools = "0.13.0"
+clap = { version = "4.5", features = ["derive"] }
+bevy_asset = "0.15.2"
+bevy_image = { version = "0.15.2", default-features = false, features = [
+    "png",
+] }
+wgpu-types = { version = "23.0", default-features = false }
