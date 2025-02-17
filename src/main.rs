@@ -12,13 +12,14 @@ use wgpu_types::{Extent3d, TextureDimension, TextureFormat};
 #[derive(Parser)]
 struct Cli {
     palette_path: PathBuf,
-    #[arg(
-        help = "Index of the color to which the output will fade. To find the index, count the colors in your palette from left to right and top to bottom (as if reading English), starting from 0, until you reach the target color."
-    )]
-    to: u8,
-    #[arg(help = "number of frames")]
-    frames: u8,
     out_path: PathBuf,
+    /// number of frames
+    frames: u8,
+    /// Indices of the colors to which the output will fade. To find an index, count the colors in
+    /// your palette from left to right and top to bottom (as if reading English), starting from 0,
+    /// until you reach the target color. Specifying multiple colors will blend them over the
+    /// frames.
+    to: Vec<u8>,
 }
 
 fn main() -> Result<()> {
@@ -46,10 +47,6 @@ fn main() -> Result<()> {
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let &(_, _, _, to) = palette_cols
-        .get(cli.to as usize)
-        .ok_or_else(|| anyhow!("color index out of bounds"))?;
-
     let mut fade = Image::new_fill(
         Extent3d {
             width: palette_width,
@@ -63,12 +60,39 @@ fn main() -> Result<()> {
     );
 
     for frame in 0..cli.frames {
-        let t_denom = cli.frames - 1;
-        let t = if t_denom == 0 {
+        let t = if cli.frames == 1 {
             0.
         } else {
-            frame as f32 / t_denom as f32
+            frame as f32 / (cli.frames - 1) as f32
         };
+
+        let to_t = if cli.to.len() <= 1 {
+            0.
+        } else {
+            (cli.to.len() - 1) as f32 * t
+        };
+
+        let to_index = to_t.trunc() as usize;
+        let to_t = to_t.fract();
+
+        let &(_, _, _, to_lower) = palette_cols
+            .get(
+                *cli.to
+                    .get(to_index)
+                    .ok_or_else(|| anyhow!("missing color index"))? as usize,
+            )
+            .ok_or_else(|| anyhow!("color index out of bounds"))?;
+
+        let to = cli
+            .to
+            .get(to_index + 1)
+            .map_or(Ok(to_lower), |&to_upper_index| -> Result<_> {
+                let &(_, _, _, to_upper) = palette_cols
+                    .get(to_upper_index as usize)
+                    .ok_or_else(|| anyhow!("color index out of bounds"))?;
+                Ok(to_lower.mix(&to_upper, to_t))
+            })?;
+
         let fade_offset = frame as u32 * palette_height;
 
         for &(palette_x, palette_y, _, palette_oklab) in &palette_cols {
